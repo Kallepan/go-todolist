@@ -16,8 +16,12 @@ import (
 	"github.com/kallepan/go-backend/utils"
 )
 
+var DEBUG = false
+
 func Run() {
-	utils.LoadEnv()
+	if DEBUG {
+		utils.LoadEnv()
+	}
 	dbInfo := utils.GetDbInfo()
 
 	address := ":8080"

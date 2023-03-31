@@ -6,17 +6,17 @@ import (
 	"github.com/kallepan/go-backend/models"
 )
 
-func (db Database) GetAllTasks() (*models.TaskList, error) {
+func (db Database) GetAllTasks(page int, page_size int) (*models.TaskList, error) {
 	list := &models.TaskList{}
 
-	rows, err := db.CON.Query("SELECT * FROM tasks ORDER BY ID NAME")
+	rows, err := db.CON.Query("SELECT * FROM tasks ORDER BY id,name LIMIT $1 OFFSET $2", page_size, page_size*(page-1))
 	if err != nil {
 		return list, err
 	}
 
 	for rows.Next() {
 		var task models.Task
-		err = rows.Scan(&task.ID, &task.Name, &task.Description, &task.CreatedAt, &task.Completed)
+		err = rows.Scan(&task.ID, &task.Name, &task.Description, &task.Completed, &task.CreatedAt)
 		if err != nil {
 			return list, err
 		}
@@ -48,7 +48,7 @@ func (db Database) GetTask(id int) (models.Task, error) {
 
 	query := "SELECT * FROM tasks WHERE id = $1"
 	row := db.CON.QueryRow(query, id)
-	switch err := row.Scan(&task.ID, &task.Name, &task.Description, &task.CreatedAt, &task.Completed); err {
+	switch err := row.Scan(&task.ID, &task.Name, &task.Description, &task.Completed, &task.CreatedAt); err {
 	case sql.ErrNoRows:
 		return task, ErrNoMatch
 	default:

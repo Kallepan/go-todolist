@@ -15,17 +15,17 @@ import (
 var taskIDKey = "taskID"
 
 func tasks(router chi.Router) {
-	router.Get("/", getAllTasksHandler)
-	router.Post("/", createTaskHandler)
+	router.With(paginate).Get("/", listTasks)
+	router.Post("/", createTask)
 	router.Route("/{taskID}", func(r chi.Router) {
-		r.Use(taskCtx)
-		r.Get("/", getTaskHandler)
-		r.Put("/", updateTaskHandler)
-		r.Delete("/", deleteTaskHandler)
+		r.Use(taskContext)
+		r.Get("/", getTask)
+		r.Put("/", updateTask)
+		r.Delete("/", deleteTask)
 	})
 }
 
-func taskCtx(next http.Handler) http.Handler {
+func taskContext(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		taskID := chi.URLParam(r, "taskID")
 		if taskID == "" {
@@ -44,11 +44,12 @@ func taskCtx(next http.Handler) http.Handler {
 	})
 }
 
-func createTaskHandler(w http.ResponseWriter, r *http.Request) {
+func createTask(w http.ResponseWriter, r *http.Request) {
 	task := &models.Task{}
 
 	if err := render.Bind(r, task); err != nil {
-		render.Render(w, r, ErrBadRequest)
+		render.Status(r, http.StatusBadRequest)
+		render.Render(w, r, ErrorRenderer(err))
 		return
 	}
 
@@ -57,17 +58,18 @@ func createTaskHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	render.Status(r, http.StatusCreated)
 	if err := render.Render(w, r, task); err != nil {
 		render.Render(w, r, ServerErrorRenderer(err))
 		return
 	}
-
-	render.Status(r, http.StatusCreated)
-	render.Render(w, r, task)
 }
 
-func getAllTasksHandler(w http.ResponseWriter, r *http.Request) {
-	tasks, err := dbInstance.GetAllTasks()
+func listTasks(w http.ResponseWriter, r *http.Request) {
+	page_size := r.Context().Value("per_page").(int)
+	page := r.Context().Value("page").(int)
+	tasks, err := dbInstance.GetAllTasks(page, page_size)
+
 	if err != nil {
 		render.Render(w, r, ServerErrorRenderer(err))
 		return
@@ -79,7 +81,7 @@ func getAllTasksHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func getTaskHandler(w http.ResponseWriter, r *http.Request) {
+func getTask(w http.ResponseWriter, r *http.Request) {
 	taskId := r.Context().Value(taskIDKey).(int)
 	task, err := dbInstance.GetTask(taskId)
 
@@ -99,7 +101,7 @@ func getTaskHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func deleteTaskHandler(w http.ResponseWriter, r *http.Request) {
+func deleteTask(w http.ResponseWriter, r *http.Request) {
 	taskId := r.Context().Value(taskIDKey).(int)
 	err := dbInstance.DeleteTask(taskId)
 
@@ -112,11 +114,9 @@ func deleteTaskHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-
-	render.Status(r, http.StatusNoContent)
 }
 
-func updateTaskHandler(w http.ResponseWriter, r *http.Request) {
+func updateTask(w http.ResponseWriter, r *http.Request) {
 	taskId := r.Context().Value(taskIDKey).(int)
 	taskData := models.Task{}
 
@@ -141,4 +141,24 @@ func updateTaskHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	render.Status(r, http.StatusAccepted)
+}
+
+// Paginate middleware
+func paginate(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		page, err := strconv.Atoi(r.URL.Query().Get("page"))
+		if err != nil {
+			page = 1
+		}
+
+		perPage, err := strconv.Atoi(r.URL.Query().Get("per_page"))
+		if err != nil {
+			perPage = 10
+		}
+
+		ctx := context.WithValue(r.Context(), "page", page)
+		ctx = context.WithValue(ctx, "per_page", perPage)
+
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
 }
