@@ -1,9 +1,9 @@
-FROM golang:1.14.6-alpine3.12 as builder
+FROM golang:1.20-bullseye as builder
 COPY go.mod go.sum /go/src/github.com/kalle/todolist/
 WORKDIR /go/src/github.com/kalle/todolist
 RUN go mod download
 COPY . /go/src/github.com/kalle/todolist
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o build/todolist github.com/kalle/todolist
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o build/todolist .
 
 FROM alpine
 RUN apk add --no-cache ca-certificates && update-ca-certificates
